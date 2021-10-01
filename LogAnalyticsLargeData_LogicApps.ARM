@@ -31,7 +31,7 @@
             "type": "String"
         },
         "log_analytics_workspace_resourceGroup": {
-            "defaultValue": "[resourceGroup().name]",
+            "defaultValue": "",
             "type": "string"
         },
         "log_analytics_workspace_name": {
@@ -39,7 +39,7 @@
             "type": "string"
         },
         "endDateTime": {
-            "defaultValue": "2021-05-13",
+            "defaultValue": "2021-09-13",
             "type": "String"
         },
         "numberOfRec": {
@@ -47,11 +47,11 @@
             "type": "Int"
         },
         "startDateTime": {
-            "defaultValue": "2021-04-13",
+            "defaultValue": "2021-08-13",
             "type": "String"
         },
         "tableName": {
-            "defaultValue": "@parameters('$tableName')",
+            "defaultValue": "AzureMetrics",
             "type": "String"
         }
     },
@@ -363,7 +363,7 @@
                                     "runAfter": {},
                                     "type": "ApiConnection",
                                     "inputs": {
-                                        "body": "@parameters('$tableName')\n| where TimeGenerated >= datetime(@{items('For_each')['StartTime']}) and TimeGenerated < datetime(@{items('For_each')['EndTime']})\n| order by TimeGenerated asc",
+                                        "body": "@{parameters('$tableName')} | where TimeGenerated >= datetime(@{items('For_each')['StartTime']}) and TimeGenerated < datetime(@{items('For_each')['EndTime']}) | order by TimeGenerated asc",
                                         "host": {
                                             "connection": {
                                                 "name": "@parameters('$connections')['azuremonitorlogs']['connectionId']"
@@ -426,7 +426,7 @@
                             "runAfter": {},
                             "type": "ApiConnection",
                             "inputs": {
-                                "body": "let innerTable = (@parameters('$tableName')\n    | where TimeGenerated between(startofday(datetime(@{triggerBody()?['TempStartTime']})) .. endofday(datetime(@{triggerBody()?['TempEndTime']})))\n    | order by TimeGenerated asc\n    | extend CurRowNum= tostring(row_number())\n    | summarize make_list (TimeGenerated) by CurRowNum);\nlet source1 = ( @parameters('$tableName')\n    | where TimeGenerated between(startofday(datetime(@{triggerBody()?['TempStartTime']})) .. endofday(datetime(@{triggerBody()?['TempEndTime']})))\n    | summarize Count=count()\n    | project CurRowNum=range(1, Count, @{triggerBody()?['numberOfRec']})\n    | mv-expand CurRowNum\n    | extend CurRowNum = tostring(parse_json(CurRowNum))\n    | join (innerTable) \n        on CurRowNum\n    | mv-expand list_TimeGenerated\n    | project TimeGenerated = todatetime(list_TimeGenerated));\nlet ExtendedTimeSeries = source1 | union (datatable (TimeGenerated:datetime) [datetime(@{addDays(triggerBody()?['TempEndTime'],1)})]);\nlet add_rownumber=(T:(TimeGenerated:datetime),shift:int64) {\n    T | order by TimeGenerated asc | extend RN=row_number()+shift\n};\nlet StartTimeSeries = ExtendedTimeSeries | invoke add_rownumber(0);\nlet EndTimeSeries = ExtendedTimeSeries | invoke add_rownumber(-1);\nStartTimeSeries | join EndTimeSeries on RN | project StartTime = TimeGenerated, EndTime = TimeGenerated1",
+                                "body": "let innerTable = (@{parameters('$tableName')} | where TimeGenerated between(startofday(datetime(@{triggerBody()?['TempStartTime']})) .. endofday(datetime(@{triggerBody()?['TempEndTime']})))\n    | order by TimeGenerated asc\n    | extend CurRowNum= tostring(row_number())\n    | summarize make_list (TimeGenerated) by CurRowNum);\nlet source1 = ( @parameters('$tableName')\n    | where TimeGenerated between(startofday(datetime(@{triggerBody()?['TempStartTime']})) .. endofday(datetime(@{triggerBody()?['TempEndTime']})))\n    | summarize Count=count()\n    | project CurRowNum=range(1, Count, @{triggerBody()?['numberOfRec']})\n    | mv-expand CurRowNum\n    | extend CurRowNum = tostring(parse_json(CurRowNum))\n    | join (innerTable) \n        on CurRowNum\n    | mv-expand list_TimeGenerated\n    | project TimeGenerated = todatetime(list_TimeGenerated));\nlet ExtendedTimeSeries = source1 | union (datatable (TimeGenerated:datetime) [datetime(@{addDays(triggerBody()?['TempEndTime'],1)})]);\nlet add_rownumber=(T:(TimeGenerated:datetime),shift:int64) {\n    T | order by TimeGenerated asc | extend RN=row_number()+shift\n};\nlet StartTimeSeries = ExtendedTimeSeries | invoke add_rownumber(0);\nlet EndTimeSeries = ExtendedTimeSeries | invoke add_rownumber(-1);\nStartTimeSeries | join EndTimeSeries on RN | project StartTime = TimeGenerated, EndTime = TimeGenerated1",
                                 "host": {
                                     "connection": {
                                         "name": "@parameters('$connections')['azuremonitorlogs']['connectionId']"
